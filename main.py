@@ -22,51 +22,59 @@ model=YOLO("yolov8n.pt")
 
 def fingerprint_match():
 
-    img1=cv2.imread(
-    "fingerprint/fp1.jpg",0
-    )
+    import cv2
 
-    img2=cv2.imread(
-    "fingerprint/fp2.jpg",0
-    )
+    # Load images
+    img1 = cv2.imread("fingerprints/fp1.jpg", 0)
+    img2 = cv2.imread("fingerprints/test_fp.jpg", 0)
 
-    orb=cv2.ORB_create()
+    # Resize (IMPORTANT)
+    img1 = cv2.resize(img1, (300, 300))
+    img2 = cv2.resize(img2, (300, 300))
 
-    kp1,des1=orb.detectAndCompute(
-    img1,None
-    )
+    # Improve contrast
+    img1 = cv2.equalizeHist(img1)
+    img2 = cv2.equalizeHist(img2)
 
-    kp2,des2=orb.detectAndCompute(
-    img2,None
-    )
+    # ORB detector
+    orb = cv2.ORB_create(nfeatures=1000)
 
-    bf=cv2.BFMatcher(
-        cv2.NORM_HAMMING,
-        crossCheck=True
-    )
+    kp1, des1 = orb.detectAndCompute(img1, None)
+    kp2, des2 = orb.detectAndCompute(img2, None)
 
-    matches=bf.match(
-        des1,
-        des2
-    )
+    # Check if descriptors exist
+    if des1 is None or des2 is None:
+        print("Fingerprint not clear!")
+        return
 
-    print(
-    "Fingerprint Match Points:",
-    len(matches)
-    )
+    # Matcher (KNN - better than simple match)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING)
 
-    output=cv2.drawMatches(
-        img1,kp1,
-        img2,kp2,
-        matches[:30],
+    matches = bf.knnMatch(des1, des2, k=2)
+
+    # Apply ratio test (VERY IMPORTANT)
+    good = []
+    for m, n in matches:
+        if m.distance < 0.75 * n.distance:
+            good.append(m)
+
+    print("Good Matches:", len(good))
+
+    # Decision threshold
+    if len(good) > 20:
+        print("Fingerprint MATCHED ✅")
+    else:
+        print("Fingerprint NOT MATCHED ❌")
+
+    # Draw matches
+    result = cv2.drawMatches(
+        img1, kp1,
+        img2, kp2,
+        good,
         None
     )
 
-    cv2.imshow(
-    "Fingerprint Matching",
-    output
-    )
-
+    cv2.imshow("Fingerprint Result", result)
     cv2.waitKey(0)
 
 
